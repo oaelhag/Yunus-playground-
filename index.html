@@ -225,7 +225,7 @@ import * as R from "./js/rooms.js";
 // الألعاب تُحمَّل واحدة واحدة: إن تعذّر تحميل لعبة تختفي هي وحدها ولا ينهار الموقع كله
 const failed = (window.__failed = window.__failed || []);
 const load = async (f) => { try { return await import(f); } catch (e) { failed.push(f + " — " + (e && e.message)); console.error("تعذّر تحميل", f, e); return null; } };
-const FILES = { xo: "xo", sudoku: "sudoku", color: "color-game", numberRush: "number-rush", balloonRace: "balloon-game", migration: "migration", memoryMatrix: "memory-matrix", oddOneOut: "odd-one-out", reverseMemory: "reverse-memory", battleship: "battleship", logicalMatrix: "logical-matrix", mastermind: "mastermind", apc: "apc", feelings: "feelings", notBelong: "not-belong", spotDiff: "spot-diff" };
+const FILES = { xo: "xo", sudoku: "sudoku", color: "color-game", numberRush: "number-rush", balloonRace: "balloon-game", migration: "migration", memoryMatrix: "memory-matrix", oddOneOut: "odd-one-out", reverseMemory: "reverse-memory", battleship: "battleship", logicalMatrix: "logical-matrix", mastermind: "mastermind", apc: "apc", feelings: "feelings", pmi: "pmi", notBelong: "not-belong", spotDiff: "spot-diff" };
 const G = {};
 await Promise.all(Object.entries(FILES).map(async ([k, f]) => { const m = await load(`./js/games/${f}.js`); if (m && m.default) G[k] = m.default; }));
 const startBot = ((await load("./js/bot.js")) || {}).startBot || (() => () => {});
@@ -250,6 +250,7 @@ const LIST = [
   { g: "notBelong", i: "🧐", t: "ماذا لا ينتمي؟", d: "اكتشف العنصر الدخيل", c: "#0d9488", h: "أربعة عناصر، ثلاثة منها تجمعها فكرة واحدة. اضغط <b>العنصر الدخيل</b>. بعد كل إجابة يظهر سبب الاختيار. الأكثر إجابات صحيحة خلال 45 ثانية يفوز." },
   { g: "spotDiff", m: "race", i: "🔎", t: "اكتشف الاختلافات (سباق)", d: "من يجد الاختلافات الخمسة أولًا", c: "#65a30d", h: "قارن الصورة الأصلية بالمعدّلة واضغط على <b>5 اختلافات</b> في الصورة السفلى (رمز مختلف، أو اختفى، أو أصغر). كل لاعب له لوحته، ومن يجدها كلها أولًا يفوز. المدة 60 ثانية." },
   { g: "spotDiff", m: "shared", i: "👀", t: "اكتشف الاختلافات (مشترك)", d: "نفس الصورة: الاختلاف لأول من يجده", c: "#0891b2", h: "صورة واحدة للاثنين: اضغط على الاختلافات في الصورة السفلى، وكل اختلاف يُحسب <b>لأول من يجده</b> ويتلوّن بلونك. الأكثر اختلافات يفوز. المدة 60 ثانية." },
+  { g: "pmi", i: "⚖️", t: "ميزان الأفكار (PMI)", d: "ميزة أم عيب أم مثير؟", c: "#7c3aed", h: "فكرة تُطرح (مثل: لو أُلغي الواجب المدرسي) وتحتها جمل. صنّف كل جملة: <b>+ ميزة</b> (نتيجة جيدة)، أو <b>− عيب</b> (مشكلة أو ضرر)، أو <b>؟ مثير</b> (سؤال أو احتمال يستحق التفكير، وليس ميزة ولا عيبًا). الأسرع والأدق في 90 ثانية يفوز." },
   { g: "apc", i: "💡", t: "ألف استخدام", d: "60 ثانية لأفكار غير مكررة", c: "#f97316", h: "اكتب خلال 60 ثانية أكبر عدد من <b>الاستخدامات غير المعتادة</b> للشيء المعروض. الفكرة المكررة بين اللاعبين تُلغى، ثم يراجع كل لاعب أفكار الآخر ويرفض غير المنطقي." }
 ];
 LIST.splice(0, LIST.length, ...LIST.filter((x) => G[x.g])); // لا نعرض إلا الألعاب التي تحمّلت فعلًا
