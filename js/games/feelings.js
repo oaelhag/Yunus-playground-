@@ -70,7 +70,7 @@ const ITEMS = [
 ];
 
 export default makeMcq({
-  id: "feelings", dur: 45000, items: ITEMS,
+  id: "feelings", dur: 60000, items: ITEMS,
   question: "ما الشعور الأنسب لهذا الموقف؟",
   hint: "اقرأ الموقف وحدّد الشعور الأنسب (لك أو لغيرك) بسرعة!"
 });
