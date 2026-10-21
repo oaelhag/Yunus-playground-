@@ -68,7 +68,7 @@ function xoMove(b, lvl) {
 const BOTS = {
   color: score, migration: score, memoryMatrix: score,
   oddOneOut: scoreFor(30000), reverseMemory: scoreFor(45000), logicalMatrix: scoreFor(50000, 4),
-  feelings: scoreFor(45000), notBelong: scoreFor(45000),
+  feelings: scoreFor(60000), notBelong: scoreFor(45000),
 
   // اكتشف الاختلافات: يجد اختلافًا كل فترة (في السباق على لوحته، وفي المشترك يحجز اختلافًا لم يُحجز)
   spotDiff: (r, p, c) => {

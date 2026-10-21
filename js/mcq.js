@@ -18,6 +18,10 @@ const CSS = `.mq{text-align:center}
 .mq-opts button:active{transform:scale(.97)}
 .mq-opts button:disabled{opacity:.45;cursor:default}
 .mq-note{min-height:2.8em;margin:10px 0 0;font-size:.92rem;color:var(--mut);line-height:1.6}
+.mq-rev{text-align:right;background:#f3f6fb;border-radius:14px;padding:12px 14px;margin-top:12px;font-size:.92rem;line-height:1.7}
+.mq-rev h4{margin:0 0 6px}
+.mq-rev ol{margin:0;padding-inline-start:20px}
+.mq-rev li{margin-bottom:8px}
 .mq-shake{animation:mqs .3s}
 @keyframes mqs{0%{transform:translateX(0)}25%{transform:translateX(-8px)}50%{transform:translateX(8px)}75%{transform:translateX(-5px)}100%{transform:translateX(0)}}`;
 if (!document.getElementById("mcq-css")) { const st = document.createElement("style"); st.id = "mcq-css"; st.textContent = CSS; document.head.append(st); }
@@ -79,6 +83,15 @@ export function makeMcq({ id, dur = 45000, items, question, hint }) {
     const lock = Date.now() < lockUntil;
     oEl.querySelectorAll("button").forEach((b) => (b.disabled = lock));
     q("mq-note").textContent = Date.now() < noteUntil ? note : "";
+    // في النهاية: ملاحظات كل ما أجبت عنه صحيحًا (الأسئلة المجابة صحيحًا هي الأولى 0..n-1 بالترتيب)
+    const rv = q("mq-rev");
+    if (final && !spec && n > 0) {
+      let html = `<h4>📝 ما تعلّمته في هذه الجولة (${n})</h4><ol>`;
+      for (let i = 0; i < n; i++) { const it = roundOf(s.seed, i).it; html += `<li><b>${esc(it.q || it.o.join("، "))}</b><br>✅ ${esc(it.o[it.a])}: ${esc(it.why)}</li>`; }
+      html += "</ol>";
+      if (rv._h !== html) { rv._h = html; rv.innerHTML = html; }
+      rv.classList.remove("hidden");
+    } else rv.classList.add("hidden");
     q("mq-again").classList.toggle("hidden", !(final && !spec));
   }
 
@@ -87,6 +100,7 @@ export function makeMcq({ id, dur = 45000, items, question, hint }) {
     el.innerHTML = `<div class="mq"><div class="c-stats" id="mq-info"></div><div class="mq-time" id="mq-time"></div>
       <div class="mq-bar"><i id="mq-bar"></i></div><p class="msg" id="mq-msg"></p>
       <div class="mq-q" id="mq-q"></div><div class="mq-opts" id="mq-opts"></div><p class="mq-note" id="mq-note"></p>
+      <div class="mq-rev hidden" id="mq-rev"></div>
       <button class="btn hidden" id="mq-again" style="margin-top:15px;width:100%">جولة جديدة</button></div>`;
     el.querySelector("#mq-opts").onpointerdown = (e) => { const b = e.target.closest("button"); if (b && !b.disabled) { e.preventDefault(); pick(+b.dataset.k); } };
     el.querySelector("#mq-again").onclick = () => cur.api.patch({ state: game.init() });
