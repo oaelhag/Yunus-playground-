@@ -22,19 +22,27 @@ const CSS = `.mq{text-align:center}
 .mq-rev h4{margin:0 0 6px}
 .mq-rev ol{margin:0;padding-inline-start:20px}
 .mq-rev li{margin-bottom:8px}
+.mq-ctx{font-size:.82rem;color:var(--mut);font-weight:600;margin-bottom:6px}
+.mq-opts.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mq-o-pl{background:#e7f7ec!important;border-color:#16a34a!important}
+.mq-o-mi{background:#fdeaea!important;border-color:#dc2626!important}
+.mq-o-in{background:#fff6dc!important;border-color:#d97706!important}
 .mq-shake{animation:mqs .3s}
 @keyframes mqs{0%{transform:translateX(0)}25%{transform:translateX(-8px)}50%{transform:translateX(8px)}75%{transform:translateX(-5px)}100%{transform:translateX(0)}}`;
 if (!document.getElementById("mcq-css")) { const st = document.createElement("style"); st.id = "mcq-css"; st.textContent = CSS; document.head.append(st); }
 
 // items: [{ q?: "نص السؤال", o: [الخيارات], a: فهرس الصحيح داخل o, why: "تفسير قصير يظهر بعد الإجابة" }]
-export function makeMcq({ id, dur = 45000, items, question, hint }) {
+export function makeMcq({ id, dur = 45000, items, question, hint, sequence, fixed, optClass }) {
   let cur = null, n = 0, lastStart = 0, lockUntil = 0, starting = false, tickId = null, note = "", noteUntil = 0;
   const phase = (s) => { const t = now(); return !s.startAt ? "wait" : t < s.startAt ? "count" : t < s.startAt + dur ? "play" : "end"; };
   const over = (s) => s.startAt && now() > s.startAt + dur + 1500;
 
+  let seqSeed = null, seqList = null;
   function roundOf(seed, i) {
-    const perm = shuffle(items.map((_, k) => k), mul(seed * 53 + 1)), it = items[perm[i % items.length]];
-    const order = shuffle(it.o.map((_, k) => k), mul(seed * 97 + i * 13 + 5)); // ترتيب الخيارات يختلف في كل مرة
+    let it;
+    if (sequence) { if (seqSeed !== seed) { seqSeed = seed; seqList = sequence(seed); } it = seqList[i % seqList.length]; }
+    else { const perm = shuffle(items.map((_, k) => k), mul(seed * 53 + 1)); it = items[perm[i % items.length]]; }
+    const order = fixed ? it.o.map((_, k) => k) : shuffle(it.o.map((_, k) => k), mul(seed * 97 + i * 13 + 5)); // الترتيب يتغير إلا إذا كان ثابتًا
     return { it, order };
   }
 
@@ -76,8 +84,9 @@ export function makeMcq({ id, dur = 45000, items, question, hint }) {
       oEl._k = key;
       if (ph === "play" && !spec) {
         const { it, order } = roundOf(s.seed, n);
-        qEl.textContent = it.q || question;
-        oEl.innerHTML = order.map((k, i) => `<button data-k="${i}">${esc(it.o[k])}</button>`).join("");
+        qEl.innerHTML = `<div>${it.ctx ? `<div class="mq-ctx">الموقف: ${esc(it.ctx)}</div>` : ""}<div>${esc(it.q || question)}</div></div>`;
+        oEl.classList.toggle("three", order.length === 3);
+        oEl.innerHTML = order.map((k, i) => `<button data-k="${i}" class="${optClass ? "mq-o-" + optClass[k] : ""}">${esc(it.o[k])}</button>`).join("");
       } else { qEl.textContent = spec && ph === "play" ? "اللاعبون يجيبون…" : ph === "end" ? "انتهى الوقت!" : "…"; oEl.innerHTML = ""; }
     }
     const lock = Date.now() < lockUntil;
@@ -87,7 +96,7 @@ export function makeMcq({ id, dur = 45000, items, question, hint }) {
     const rv = q("mq-rev");
     if (final && !spec && n > 0) {
       let html = `<h4>📝 ما تعلّمته في هذه الجولة (${n})</h4><ol>`;
-      for (let i = 0; i < n; i++) { const it = roundOf(s.seed, i).it; html += `<li><b>${esc(it.q || it.o.join("، "))}</b><br>✅ ${esc(it.o[it.a])}: ${esc(it.why)}</li>`; }
+      for (let i = 0; i < n; i++) { const it = roundOf(s.seed, i).it; html += `<li><b>${it.ctx ? esc(it.ctx) + " ← " : ""}${esc(it.q || it.o.join("، "))}</b><br>✅ ${esc(it.o[it.a])}: ${esc(it.why)}</li>`; }
       html += "</ol>";
       if (rv._h !== html) { rv._h = html; rv.innerHTML = html; }
       rv.classList.remove("hidden");
