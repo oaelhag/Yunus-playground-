@@ -1,0 +1,15 @@
+{
+  "name": "\u0623\u0644\u0639\u0627\u0628 \u062b\u0646\u0627\u0626\u064a\u0629",
+  "short_name": "\u0623\u0644\u0639\u0627\u0628",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}
