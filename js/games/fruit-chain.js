@@ -1,9 +1,8 @@
 import { now } from "../rooms.js";
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const DUR = 60000, LEAD = 4000, LOCK = 500;
+const DUR = 60000, LEAD = 4000, LOCK = 400;
 
-// قائمة الفواكه المتاحة
 const FRUITS = [
   { name: "تفاح", icon: "🍎" },
   { name: "موز", icon: "🍌" },
@@ -19,11 +18,11 @@ const FRUITS = [
 
 function mul(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
-// توليد تسلسل عشوائي ثابت من الفواكه لكل لاعب بناءً على البذرة
-function getFruitSequence(seed, length) {
-  const r = mul(seed * 777 + length * 13);
+// توليد تسلسل ثابت للفواكه بناءً على البذرة
+function getFruitSequence(seed, maxLen) {
+  const r = mul(seed * 777);
   let seq = [];
-  for (let i = 0; i < length; i++) {
+  for (let i = 0; i < maxLen + 5; i++) {
     seq.push((r() * FRUITS.length) | 0);
   }
   return seq;
@@ -33,8 +32,8 @@ const CSS = `.fc{text-align:center}
 .fc-time{font-size:2.2rem;font-weight:800}
 .fc-bar{height:10px;background:#d5dee9;border-radius:6px;overflow:hidden;margin:4px 0 8px}
 .fc-bar i{display:block;height:100%;width:100%;background:var(--ink);transition:width .1s linear}
-.fc-chain-box{background:rgba(0,0,0,0.04);padding:10px;border-radius:12px;margin:10px 0;min-height:48px;display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap}
-.fc-badge{background:#fff;border:1px solid var(--line);padding:4px 8px;border-radius:8px;font-weight:700;font-size:0.9rem}
+.fc-target-box{background:#f8faff;border:2px dashed var(--o);padding:12px;border-radius:14px;margin:12px 0;font-size:1.2rem;font-weight:800;color:var(--ink);min-height:60px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+.fc-target-box span{font-size:1.6rem}
 .fc-grid{display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;margin:15px auto;max-width:320px}
 .fc-tile{aspect-ratio:1.1;background:#fff;border:2px solid var(--line);border-radius:14px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;touch-action:manipulation;transition:all .15s ease}
 .fc-tile span{font-size:1.8rem}
@@ -47,7 +46,7 @@ const CSS = `.fc{text-align:center}
 if (!document.getElementById("fc-css")) { const st = document.createElement("style"); st.id = "fc-css"; st.textContent = CSS; document.head.append(st); }
 
 let cur = null, lastStart = 0, lockUntil = 0, starting = false, tickId = null;
-let currentStep = 0; // الخطوة الحالية داخل السلسلة التي يدخلها اللاعب
+let currentStep = 0; // الخطوة المطلوبة حالياً من السلسلة
 
 const phase = (s) => { const t = now(); return !s.startAt ? "wait" : t < s.startAt ? "count" : t < s.startAt + DUR ? "play" : "end"; };
 
@@ -55,20 +54,20 @@ function chooseFruit(fruitIndex) {
   const { room: r, me, api } = cur, s = r.state;
   if (me === "spec" || phase(s) !== "play" || Date.now() < lockUntil) return;
 
-  const currentLevel = (s.scores && s.scores[me]) || 1; // طول السلسلة الحالية
-  const targetSeq = getFruitSequence(s.seed, currentLevel);
-  const expectedFruit = targetSeq[currentStep];
+  const currentLevel = (s.scores && s.scores[me]) || 1;
+  const seq = getFruitSequence(s.seed, currentLevel + 2);
+  const expectedFruit = seq[currentStep];
 
   if (fruitIndex === expectedFruit) {
     currentStep++;
-    // إذا نجح في إدخال السلسلة بالكامل حتى النهاية
+    // إذا أتم اللاعب إدخال السلسلة الحالية كاملة، ننتقل للمستوى التالي (تطويل السلسلة)
     if (currentStep === currentLevel) {
       currentStep = 0;
       const nextLevel = currentLevel + 1;
       api.patch({ [`state/scores/${me}`]: nextLevel });
     }
   } else {
-    // خطأ: اعادة السلسلة من البداية لعقاب الذاكرة
+    // خطأ: اهتزاز وإعادة البدء من أول السلسلة
     lockUntil = Date.now() + LOCK;
     currentStep = 0;
     const gridEl = cur.el.querySelector("#fc-grid");
@@ -88,30 +87,43 @@ function tick() {
   const end = (s.startAt || 0) + DUR;
 
   q("fc-info").innerHTML = spec
-    ? `<b class="x">${esc(r.host.name)}: سلسلة ${hs}</b><b class="o">${esc(r.guest.name)}: سلسلة ${gs}</b>`
-    : `<b class="o">سلسلتك: ${s.scores[me] || 1} فواكه</b><b class="x">خصمك: ${s.scores[me === "host" ? "guest" : "host"] || 1} فواكه</b>`;
+    ? `<b class="x">${esc(r.host.name)}: طول السلسلة ${hs}</b><b class="o">${esc(r.guest.name)}: طول السلسلة ${gs}</b>`
+    : `<b class="o">سلسلتك: ${s.scores[me] || 1}</b><b class="x">الخصم: ${s.scores[me === "host" ? "guest" : "host"] || 1}</b>`;
 
   const rem = ph === "play" ? (end - t) / 1000 : ph === "end" ? 0 : DUR / 1000;
   q("fc-time").textContent = Math.max(0, rem).toFixed(1);
   q("fc-bar").style.width = Math.max(0, (rem / (DUR / 1000))) * 100 + "%";
 
-  const msgEl = q("fc-msg"); let msg = "تذكر الفواكه بالترتيب وأضف الفاكهة الجديدة!";
+  const msgEl = q("fc-msg"); let msg = "";
   let final = false;
 
-  if (ph === "wait") { msg = "جارٍ تحضير قائمة الفواكه…"; }
+  if (ph === "wait") { msg = "جارٍ تجهيز اللعبة…"; }
   else if (ph === "count") { msg = `استعد! تبدأ اللعبة خلال ${Math.ceil((s.startAt - t) / 1000)} ثوانٍ`; }
   else if (ph === "play") {
-    if (spec) msg = "وضع المتفرج - تتبع تحدي سلسلة الفواكه";
-    else {
-      msg = `أدخل العنصر رقم (${currentStep + 1}) من أصل ${s.scores[me] || 1}`;
+    if (spec) {
+      msg = "وضع المتفرج - تتبع سلسلة الفواكه";
+    } else {
+      msg = `أدخل العنصر رقم (${currentStep + 1}) من أصل (${s.scores[me] || 1})`;
+      
+      // عرض الفواكه المطلوبة حتى هذه الخطوة ليراها اللاعب بوضوح تام
+      const seq = getFruitSequence(s.seed, (s.scores[me] || 1) + 2);
+      const targetBox = q("fc-target");
+      if (targetBox) {
+        let html = "<b> مطلوب إدخال التسلسل: </b><br>";
+        for (let i = 0; i <= currentStep && i < (s.scores[me] || 1); i++) {
+          const f = FRUITS[seq[i]];
+          html += `<span title="${f.name}">${f.icon}</span> `;
+        }
+        targetBox.innerHTML = html;
+      }
     }
   } else {
     if (t < end + 1500) {
-      msg = "جارٍ احتساب أطول سلسلة…";
+      msg = "جارٍ احتساب النتيجة النهائية…";
     } else {
       final = true;
       const win = hs > gs ? "host" : gs > hs ? "guest" : null;
-      msg = (!win ? "تعادل!" : win === me ? "فزت بأطول سلسلة ذاكرة!" : `فاز ${esc(r[win].name)}`) + ` (${hs} مقابل ${gs})`;
+      msg = (!win ? "تعادل!" : win === me ? "فزت في تحدي الذاكرة والتسلسل!" : `فاز ${esc(r[win].name)}`) + ` (طول السلسلة: ${hs} مقابل ${gs})`;
     }
   }
 
@@ -129,12 +141,14 @@ function build(el, room) {
     <div class="fc-time" id="fc-time"></div>
     <div class="fc-bar"><i id="fc-bar"></i></div>
     <p class="msg" id="fc-msg"></p>
+    
+    <div class="fc-target-box" id="fc-target">أضف العنصر الأول</div>
 
     <div class="fc-grid" id="fc-grid">
       ${FRUITS.map((f, i) => `<button class="fc-tile" data-index="${i}"><span>${f.icon}</span>${esc(f.name)}</button>`).join("")}
     </div>
 
-    <button class="btn hidden" id="fc-again" style="margin-top:15px;width:100%">جولة جديدة</button>
+    <button class="btn hidden" id="fc-again" style="margin-top:15px;width:100%">لعبة جديدة</button>
   </div>`;
 
   el.querySelector("#fc-grid").onpointerdown = (e) => {
@@ -152,7 +166,7 @@ function build(el, room) {
 }
 
 const game = {
-  id: "fruit-chain",
+  id: "fruitChain",
   init: () => ({ 
     seed: (Math.random() * 1e6) | 0, 
     scores: { host: 1, guest: 1 } 
