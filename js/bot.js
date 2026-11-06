@@ -14,7 +14,7 @@ const PACE = {
   color: [2200, 1300, 800], migration: [1700, 1050, 680], memoryMatrix: [9000, 6000, 4200],
   numberRush: [1900, 1400, 1000], balloonRace: [1400, 900, 550], sudoku: [7000, 4500, 2800], mastermind: [9000, 6000, 3500],
   oddOneOut: [2200, 1400, 900], reverseMemory: [16000, 10000, 6500], logicalMatrix: [14000, 9000, 5500], battleship: [2200, 1500, 1000],
-  feelings: [6000, 4000, 2500], pmi: [7000, 4500, 3000], notBelong: [5500, 3600, 2200], spotDiff: [6000, 3800, 2200]
+  feelings: [6000, 4000, 2500], pmi: [7000, 4500, 3000], fruitChain: [9000, 6000, 4000], notBelong: [5500, 3600, 2200], spotDiff: [6000, 3800, 2200]
 };
 
 function due(c, t) {
@@ -68,7 +68,7 @@ function xoMove(b, lvl) {
 const BOTS = {
   color: score, migration: score, memoryMatrix: score,
   oddOneOut: scoreFor(30000), reverseMemory: scoreFor(45000), logicalMatrix: scoreFor(50000, 4),
-  feelings: scoreFor(60000), notBelong: scoreFor(45000), pmi: scoreFor(90000),
+  feelings: scoreFor(60000), notBelong: scoreFor(45000), pmi: scoreFor(90000), fruitChain: scoreFor(60000),
 
   // اكتشف الاختلافات: يجد اختلافًا كل فترة (في السباق على لوحته، وفي المشترك يحجز اختلافًا لم يُحجز)
   spotDiff: (r, p, c) => {
