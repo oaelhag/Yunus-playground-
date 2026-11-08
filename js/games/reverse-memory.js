@@ -37,40 +37,23 @@ let showingPattern = false, showStepIndex = -1, inputStep = 0, playerInput = [];
 
 const phase = (s) => { const t = now(); return !s.startAt ? "wait" : t < s.startAt ? "count" : t < s.startAt + DUR ? "play" : "end"; };
 
-// تشغيل عرض النمط بصرياً قبل أن يبدأ اللاعب بالإدخال
+// عرض النمط: كل مربع يضيء 0.55ث ثم ينطفئ 0.25ث (الفاصل ضروري ليظهر تكرار نفس المربع)
+let showToken = 0;
+const tileEl = (n) => cur && cur.el.querySelector(`#rm-grid [data-index="${n}"]`);
 function triggerShowPattern(seq) {
   if (showingPattern) return;
-  showingPattern = true;
-  showStepIndex = 0;
-  playerInput = [];
-  inputStep = 0;
-
-  const interval = setInterval(() => {
-    if (!cur || phase(cur.room.state) !== "play") {
-      clearInterval(interval);
-      showingPattern = false;
-      return;
-    }
-    const gridEl = cur.el.querySelector("#rm-grid");
-    if (!gridEl) { clearInterval(interval); showingPattern = false; return; }
-    
-    // إزالة الضوء عن الكل
-    gridEl.querySelectorAll(".rm-tile").forEach(t => t.classList.remove("highlight"));
-
-    if (showStepIndex < seq.length) {
-      const tile = gridEl.querySelector(`[data-index="${seq[showStepIndex]}"]`);
-      if (tile) tile.classList.add("highlight");
-      showStepIndex++;
-    } else {
-      clearInterval(interval);
-      setTimeout(() => {
-        if (cur && cur.el.querySelector("#rm-grid")) {
-          cur.el.querySelector("#rm-grid").querySelectorAll(".rm-tile").forEach(t => t.classList.remove("highlight"));
-        }
-        showingPattern = false;
-      }, 400);
-    }
-  }, 700); // سرعة إضاءة كل مربع
+  showingPattern = true; inputStep = 0;
+  const tok = ++showToken;
+  let i = 0;
+  const step = () => {
+    if (tok !== showToken) return;
+    if (!cur || phase(cur.room.state) !== "play" || !cur.el.querySelector("#rm-grid")) { showingPattern = false; return; }
+    if (i >= seq.length) { showingPattern = false; return; }
+    const t = tileEl(seq[i++]);
+    if (t) t.classList.add("highlight");
+    setTimeout(() => { if (t) t.classList.remove("highlight"); setTimeout(step, 250); }, 550);
+  };
+  setTimeout(step, 400);
 }
 
 function choose(index) {
@@ -94,6 +77,7 @@ function choose(index) {
     // إذا أكمل اللاعب إدخال النمط بالعكس كاملاً وبشكل صحيح
     if (inputStep === seq.length) {
       const newScore = currentScore + 1;
+      inputStep = 0; lockUntil = Date.now() + 500;
       api.patch({ [`state/scores/${me}`]: newScore });
     }
   } else {
@@ -150,8 +134,7 @@ function tick() {
     const gridEl = q("rm-grid");
     if (gridEl && gridEl.dataset.shown !== s.seed + ":" + myScore && !showingPattern) {
       gridEl.dataset.shown = s.seed + ":" + myScore;
-      const seq = getPattern(s.seed, myScore);
-      setTimeout(() => triggerShowPattern(seq), 300);
+      triggerShowPattern(getPattern(s.seed, myScore));
     }
   }
 
@@ -206,7 +189,7 @@ const game = {
   }),
   render(el, room, me, api) {
     const s = room.state, st = s.startAt || 0;
-    if (st !== lastStart) { lastStart = st; starting = false; inputStep = 0; showingPattern = false; }
+    if (st !== lastStart) { lastStart = st; starting = false; inputStep = 0; showingPattern = false; showToken++; }
     cur = { el, room, me, api };
 
     if (me === "host" && !s.startAt && !starting) { 

@@ -1,7 +1,7 @@
 import { now } from "../rooms.js";
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const DUR = 60000, LEAD = 4000, LOCK = 500, SHOW = 800; // المدة، العد التنازلي، عقوبة الخطأ، زمن عرض كل فاكهة
+const DUR = 120000, LEAD = 4000, LOCK = 500, SHOW = 800, WIN = 10; // سقف الوقت، العد التنازلي، عقوبة الخطأ، زمن عرض كل فاكهة، السلسلة المطلوبة للفوز
 
 const FRUITS = [
   { name: "تفاح", icon: "🍎" }, { name: "موز", icon: "🍌" }, { name: "برتقال", icon: "🍊" }, { name: "عنب", icon: "🍇" }, { name: "بطيخ", icon: "🍉" },
@@ -33,8 +33,17 @@ if (!document.getElementById("fc-css")) { const st = document.createElement("sty
 let cur = null, lastStart = 0, lockUntil = 0, starting = false, tickId = null;
 let step = 0, showing = false, shownKey = "", showTimer = null;
 
-const phase = (s) => { const t = now(); return !s.startAt ? "wait" : t < s.startAt ? "count" : t < s.startAt + DUR ? "play" : "end"; };
-const over = (s) => s.startAt && now() > s.startAt + DUR + 1500;
+// تنتهي الجولة عندما يصل أحدهما إلى سلسلة WIN (يُسجَّل وقت وصوله في state/finish) أو ينتهي سقف الوقت
+const endAt = (s) => Math.min(s.startAt + DUR, ...Object.values(s.finish || {}));
+const phase = (s) => { const t = now(); return !s.startAt ? "wait" : t < s.startAt ? "count" : t < endAt(s) ? "play" : "end"; };
+const over = (s) => s.startAt && now() > endAt(s) + 1500;
+// الفائز: الأسبق وصولًا إلى السلسلة المطلوبة، وإلا الأطول سلسلة عند انتهاء الوقت
+function winner(s) {
+  const f = Object.entries(s.finish || {}).sort((a, b) => a[1] - b[1]);
+  if (f.length) return f.length > 1 && f[0][1] === f[1][1] ? null : f[0][0];
+  const h = level(s, "host"), g = level(s, "guest");
+  return h > g ? "host" : g > h ? "guest" : null;
+}
 
 // عرض السلسلة فاكهة بعد فاكهة (ثم تختفي ويُطلب من اللاعب إعادتها من الذاكرة)
 function startShow(len) {
@@ -56,7 +65,12 @@ function choose(k) {
   const L = level(s, me);
   if (k === seqOf(s.seed, L)[step]) {
     step++;
-    if (step === L) { step = 0; api.patch({ [`state/scores/${me}`]: L + 1 }); } // أتمّ السلسلة: تطول فاكهة
+    if (step === L) { // أتمّ السلسلة: تطول فاكهة، وعند الوصول للهدف تنتهي الجولة
+      step = 0;
+      const o = { [`state/scores/${me}`]: L + 1 };
+      if (L >= WIN) o[`state/finish/${me}`] = now();
+      api.patch(o);
+    }
   } else {
     lockUntil = Date.now() + LOCK; step = 0; // خطأ: يبدأ الإدخال من أول السلسلة
     const g = cur.el.querySelector("#fc-grid"); g.classList.add("fc-shake"); setTimeout(() => g.classList.remove("fc-shake"), 300);
@@ -70,9 +84,9 @@ function tick() {
   const hs = level(s, "host"), gs = level(s, "guest"), op = me === "host" ? "guest" : "host", end = (s.startAt || 0) + DUR;
   // السلسلة المنجزة = المستوى - 1
   q("fc-info").innerHTML = spec
-    ? `<b class="x">${esc(r.host.name)}: ${hs - 1}</b><b class="o">${esc(r.guest.name)}: ${gs - 1}</b>`
-    : `<b class="o">أطول سلسلة أنجزتها: ${level(s, me) - 1}</b><b class="x">${esc(r[op].name)}: ${level(s, op) - 1}</b>`;
-  const rem = ph === "play" ? (end - t) / 1000 : ph === "end" ? 0 : DUR / 1000;
+    ? `<b class="x">${esc(r.host.name)}: ${hs - 1}/${WIN}</b><b class="o">${esc(r.guest.name)}: ${gs - 1}/${WIN}</b>`
+    : `<b class="o">سلسلتك: ${level(s, me) - 1}/${WIN}</b><b class="x">${esc(r[op].name)}: ${level(s, op) - 1}/${WIN}</b>`;
+  const rem = ph === "play" ? (Math.min(end, endAt(s)) - t) / 1000 : ph === "end" ? 0 : DUR / 1000;
   q("fc-time").textContent = Math.max(0, rem).toFixed(1);
   q("fc-bar").style.width = Math.max(0, rem / (DUR / 1000)) * 100 + "%";
 
@@ -94,8 +108,8 @@ function tick() {
   } else if (!over(s)) msg = "جارٍ احتساب النتيجة…";
   else {
     final = true; box.textContent = "انتهى الوقت!";
-    const win = hs > gs ? "host" : gs > hs ? "guest" : null;
-    msg = (!win ? "تعادل!" : win === me ? "فزت! 🎉" : `فاز ${esc(r[win].name)}`) + ` (${hs - 1} مقابل ${gs - 1})`;
+    const win = winner(s), got = Object.keys(s.finish || {}).length > 0;
+    msg = (!win ? "تعادل!" : win === me ? (got ? `فزت! وصلت أولًا إلى سلسلة ${WIN} 🎉` : "فزت! 🎉") : `فاز ${esc(r[win].name)}` + (got ? ` ووصل أولًا إلى سلسلة ${WIN}` : "")) + ` (${hs - 1} مقابل ${gs - 1})`;
   }
   const m = q("fc-msg"); m.innerHTML = msg; m.className = "msg" + (final ? " mine" : "");
   q("fc-replay").classList.toggle("hidden", !(ph === "play" && !spec && !showing));
@@ -124,8 +138,9 @@ function build(el, room) {
 const game = {
   id: "fruitChain",
   init: () => ({ seed: (Math.random() * 1e6) | 0, scores: { host: 1, guest: 1 } }),
-  final(room, me) { const s = room.state; return over(s) ? { key: s.seed + ":" + s.startAt, score: level(s, me) - 1 } : null; },
-  outcome(room) { const s = room.state; if (!over(s)) return null; const h = level(s, "host"), g = level(s, "guest"); return { w: h > g ? "host" : g > h ? "guest" : "draw" }; },
+  // أفضل نتيجة: طول السلسلة، وعند التساوي الأسرع وصولًا (الوقت يُسجَّل لمن أكمل الهدف)
+  final(room, me) { const s = room.state; if (!over(s)) return null; const f = s.finish && s.finish[me]; return { key: s.seed + ":" + s.startAt, score: level(s, me) - 1, time: f ? (f - s.startAt) / 1000 : null }; },
+  outcome(room) { const s = room.state; return over(s) ? { w: winner(s) || "draw" } : null; },
   render(el, room, me, api) {
     const s = room.state, st = s.startAt || 0;
     if (st !== lastStart) { lastStart = st; starting = false; step = 0; showing = false; shownKey = ""; clearInterval(showTimer); }

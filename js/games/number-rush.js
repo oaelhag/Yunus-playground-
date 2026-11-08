@@ -1,7 +1,10 @@
 import { now } from "../rooms.js";
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const DUR = 30000, LEAD = 4000, LOCK = 400, N = 16; // المدة، العد التنازلي، عقوبة الخطأ، عدد الأرقام
+const LEAD = 4000, LOCK = 400, N = 16; // العد التنازلي، عقوبة الخطأ، عدد الأرقام
+// الوضع العادي: 1..16. وضع الجدول: مضاعفات step (3، 6، 9 …) ويحتاج وقتًا أطول لأنه يحتاج حسابًا ذهنيًا
+const stepOf = (s) => (s.step > 1 ? s.step : 1);
+const durOf = (s) => (stepOf(s) > 1 ? 45000 : 30000);
 
 function mul(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
@@ -13,7 +16,7 @@ function layout(seed) {
 }
 
 // تنتهي الجولة بانتهاء الوقت أو بإنهاء أحد اللاعبين كل الأرقام، أيهما أقرب
-const endAt = (s) => Math.min(s.startAt + DUR, ...Object.values(s.finish || {}));
+const endAt = (s) => Math.min(s.startAt + durOf(s), ...Object.values(s.finish || {}));
 const phase = (s) => { const t = now(); return !s.startAt ? "wait" : t < s.startAt ? "count" : t < endAt(s) ? "play" : "end"; };
 
 const CSS = `.nr{text-align:center}
@@ -51,7 +54,7 @@ function tick() {
   if (!cur || !cur.el.querySelector(".nr")) return;
   const { el, room: r, me } = cur, s = r.state, ph = phase(s), t = now(), spec = me === "spec", q = (id) => el.querySelector("#" + id);
   const hs = s.scores.host || 0, gs = s.scores.guest || 0, op = me === "host" ? "guest" : "host";
-  const end = s.startAt ? endAt(s) : 0;
+  const end = s.startAt ? endAt(s) : 0, K = stepOf(s), DUR = durOf(s);
 
   q("nr-info").innerHTML = spec
     ? `<b class="x">${esc(r.host.name)}: ${hs}/${N}</b><b class="o">${esc(r.guest.name)}: ${gs}/${N}</b>`
@@ -64,7 +67,11 @@ function tick() {
   let msg = "", final = false;
   if (ph === "wait") msg = "جارٍ التجهيز…";
   else if (ph === "count") msg = `استعد! تبدأ اللعبة خلال ${Math.ceil((s.startAt - t) / 1000)} ثوانٍ`;
-  else if (ph === "play") msg = spec ? "وضع المتفرج - تتبع السباق" : `اضغط الأرقام بالترتيب 🎯 <span style="font-size:1.5rem;color:var(--o)">${n + 1}</span>`;
+  else if (ph === "play") {
+    if (spec) msg = "وضع المتفرج - تتبع السباق";
+    else if (K === 1) msg = `اضغط الأرقام بالترتيب 🎯 <span style="font-size:1.5rem;color:var(--o)">${n + 1}</span>`;
+    else msg = n ? `جدول ${K}: آخر رقم <b>${n * K}</b> — ما التالي؟ 🤔` : `جدول ${K}: ابدأ من <b>${K}</b>، ثم الذي بعده في الجدول`; // لا نكتب الرقم التالي: الحساب جزء من اللعبة
+  }
   else if (t < end + 1500) msg = "جارٍ احتساب النتيجة النهائية…";
   else {
     final = true;
@@ -79,7 +86,7 @@ function tick() {
   el.querySelectorAll(".nr-tile").forEach((tl) => {
     const num = +tl.dataset.num, gone = num <= cleared;
     tl.classList.toggle("empty", gone);
-    tl.textContent = gone || !live ? "" : num;
+    tl.textContent = gone || !live ? "" : num * K;
   });
   q("nr-again").classList.toggle("hidden", !(final && !spec));
 }
@@ -98,7 +105,7 @@ function build(el, room) {
     const tl = e.target.closest(".nr-tile");
     if (tl && !tl.classList.contains("empty")) { e.preventDefault(); tap(+tl.dataset.num); }
   };
-  el.querySelector("#nr-again").onclick = () => cur.api.patch({ state: game.init() });
+  el.querySelector("#nr-again").onclick = () => cur.api.patch({ state: game.init(stepOf(cur.room.state) > 1 ? "x3" : undefined) });
 }
 
 const game = {
@@ -110,7 +117,7 @@ const game = {
     const mine = s.finish && s.finish[me];
     return { key: s.seed + ":" + s.startAt, score: (s.scores && s.scores[me]) || 0, time: mine ? (mine - s.startAt) / 1000 : null };
   },
-  init: () => ({ seed: (Math.random() * 1e6) | 0, scores: { host: 0, guest: 0 } }),
+  init: (mode) => ({ seed: (Math.random() * 1e6) | 0, scores: { host: 0, guest: 0 }, ...(mode === "x3" ? { step: 3 } : {}) }),
   render(el, room, me, api) {
     const s = room.state, st = s.startAt || 0;
     if (st !== lastStart) { lastStart = st; n = (s.scores && s.scores[me]) || 0; starting = false; }
