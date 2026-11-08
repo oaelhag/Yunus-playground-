@@ -14,7 +14,8 @@ const PACE = {
   color: [2200, 1300, 800], migration: [1700, 1050, 680], memoryMatrix: [9000, 6000, 4200],
   numberRush: [1900, 1400, 1000], balloonRace: [1400, 900, 550], sudoku: [7000, 4500, 2800], mastermind: [9000, 6000, 3500],
   oddOneOut: [2200, 1400, 900], reverseMemory: [16000, 10000, 6500], logicalMatrix: [14000, 9000, 5500], battleship: [2200, 1500, 1000],
-  feelings: [6000, 4000, 2500], pmi: [7000, 4500, 3000], fruitChain: [9000, 6000, 4000], notBelong: [5500, 3600, 2200], spotDiff: [6000, 3800, 2200]
+  feelings: [6000, 4000, 2500], pmi: [7000, 4500, 3000], fruitChain: [12000, 8500, 6000], notBelong: [5500, 3600, 2200], spotDiff: [6000, 3800, 2200],
+  nBack: [9000, 6500, 4500], corsi: [14000, 9500, 6500], whatChanged: [7500, 5000, 3300]
 };
 
 function due(c, t) {
@@ -68,7 +69,11 @@ function xoMove(b, lvl) {
 const BOTS = {
   color: score, migration: score, memoryMatrix: score,
   oddOneOut: scoreFor(30000), reverseMemory: scoreFor(45000), logicalMatrix: scoreFor(50000, 4),
-  feelings: scoreFor(60000), notBelong: scoreFor(45000), pmi: scoreFor(90000), fruitChain: scoreFor(60000),
+  nBack: scoreFor(60000, 8), corsi: scoreFor(60000, 9), whatChanged: scoreFor(60000), feelings: scoreFor(60000), notBelong: scoreFor(45000), pmi: scoreFor(90000), fruitChain: (r, p, c) => { // سباق إلى سلسلة 10: عند الوصول يُسجَّل وقت الانتهاء
+    const t = now(), sc = r.state.scores || {}, n = (sc.guest || 1) + 1;
+    if ((sc.guest || 1) >= 11 || (sc.host || 1) >= 11) return;
+    if (live(r.state, t, 120000) && due(c, t)) p(n >= 11 ? { "state/scores/guest": n, "state/finish/guest": t } : { "state/scores/guest": n });
+  },
 
   // اكتشف الاختلافات: يجد اختلافًا كل فترة (في السباق على لوحته، وفي المشترك يحجز اختلافًا لم يُحجز)
   spotDiff: (r, p, c) => {
@@ -121,7 +126,8 @@ const BOTS = {
 
   numberRush: (r, p, c) => {
     const s = r.state, t = now();
-    if (!live(s, t) || !due(c, t)) return;
+    if (!live(s, t, s.step > 1 ? 45000 : 30000) || !due(c, t)) return;
+    if (s.step > 1 && (c.k = (c.k || 0) + 1) % 2) return; // وضع الجدول أبطأ لأنه يحتاج حسابًا
     const n = (s.scores.guest || 0) + 1;
     if (n > 16) return;
     const q = { "state/scores/guest": n };

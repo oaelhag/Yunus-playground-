@@ -23,7 +23,7 @@ export function outcome(r, G) {
     case "numberRush": {
       const f = s.finish ? Object.entries(s.finish).sort((p, q) => p[1] - q[1])[0] : null; // أول من أنهى الأرقام
       if (f && t > f[1] + 1500) return { w: f[0] };
-      return after(30000) ? { w: cmp() } : null;
+      return after(s.step > 1 ? 45000 : 30000) ? { w: cmp() } : null;
     }
     case "logicalMatrix": return H >= 4 || Gu >= 4 || after(50000) ? { w: cmp() } : null;
     case "battleship": return H >= 4 || Gu >= 4 || after(90000) ? { w: cmp() } : null;
